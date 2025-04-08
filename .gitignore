@@ -8,3 +8,7 @@ scripts/
 docker/
 ppo_imp/
 test_logs/
+
+*.slurm
+slurm_logs/
+
