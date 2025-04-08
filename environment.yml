@@ -1,0 +1,16 @@
+name: /home/kierkegaard/conda_envs/rl_env_39
+channels:
+  - https://repo.anaconda.com/pkgs/main
+  - https://repo.anaconda.com/pkgs/r
+dependencies:
+  - python=3.9
+  - pip
+  - pip: ## make sure you install right version of cuda (massive requires 11.1)
+    - numpy==1.22.0
+    - torch==1.9.1
+    - torchvision>=0.6.1
+    - gym==0.17.2
+    - seaborn
+    - tensorflow==2.11.0
+    - git+https://github.com/Farama-Foundation/Metaworld.git@08489b46faffe3bfdeaa1287fa108260e74e194d # hopefully last commit before mujoco upgrade
+
