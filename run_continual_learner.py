@@ -45,6 +45,7 @@ def main():
     parser.add_argument('--min_right_value', type=float, default = 0.05, help = 'minimum gating value for the right network when stepping')
     parser.add_argument('--init_right_value', type=float, default=0.95, help="Initialisation value for right gate when using scheduler")
     parser.add_argument('--step_gate_every', type=int, default=10, help = 'frequency of gating scheduler updates - expressed in network updates')
+    parser.add_argument('--gating_combination_method', type=str, default='summation', help='methods to combine the output of two networks [summation, select_sample]')
         
     ## PPO params
     parser.add_argument('--ppo_clip_param', type=float, default=0.2, help='PPO clip parameter')
