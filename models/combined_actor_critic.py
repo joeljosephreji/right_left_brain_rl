@@ -1,4 +1,4 @@
-import torch
+import torchcombin
 import torch.nn as nn
 import numpy as np
 from models.policy import FixedNormal
@@ -187,9 +187,12 @@ class BiHemActorCritic(nn.Module):
             std = torch.max(self.min_std, self.logstd.exp())
             dist = FixedNormal(combined_action_means, std)
         elif (self.gating_combination_method == GatingCombine.SELECT_SAMPLE):
-            std_devs = torch.zeros(size=(2, self.left_actor_critic.policy.dist.logstd.shape[0]))
-            std_devs[0] = self.left_actor_critic.policy.dist.logstd.exp()
-            std_devs[1] = self.right_actor_critic.policy.dist.logstd.exp()
+            # for preserving the computational graph and handling the two std devs
+            std_devs = torch.stack([
+                self.left_actor_critic.policy.dist.logstd.exp(),
+                self.right_actor_critic.policy.dist.logstd.exp()
+            ])
+
             softmax_std_devs = torch.softmax(std_devs, axis=0)
             hemisphere_confidence = 1 - torch.prod(softmax_std_devs, axis=1) # softmax represents the spread of distribution, therefore, lesser spread -> more confident
 
