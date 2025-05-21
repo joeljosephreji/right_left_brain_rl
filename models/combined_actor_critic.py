@@ -203,11 +203,11 @@ class BiHemActorCritic(nn.Module):
             if (left_gate_value_mean * hemisphere_confidence[0].item()) > (right_gate_value_mean * hemisphere_confidence[1].item()):
                 # go with left hemisphere
                 combined_values = left_gate_value * left_value
-                dist = self.left_actor_critic.policy.dist(left_actor_features) # TODO Joel why are we passing the actor features?
+                dist = self.left_actor_critic.policy.dist(left_actor_features)
             else:
                 # go with right hemisphere
                 combined_values = right_gate_value * right_value
-                dist = self.right_actor_critic.policy.dist(right_actor_features) # TODO Joel why are we passing the actor features?
+                dist = self.right_actor_critic.policy.dist(right_actor_features)
 
         if deterministic:
             actions = dist.mean
