@@ -7,9 +7,9 @@ def get_args(rest_args):
 
     # --- GENERAL ---
 
-    parser.add_argument('--num_frames', type=int, default=1e8, help='number of frames to train')
-    parser.add_argument('--max_rollouts_per_task', type=int, default=2, help='number of MDP episodes for adaptation')
-    parser.add_argument('--exp_label', default='rl2', help='label (typically name of method)')
+    parser.add_argument('--num_frames', type=int, default=5e7, help='number of frames to train')
+    parser.add_argument('--max_rollouts_per_task', type=int, default=10, help='number of MDP episodes for adaptation')
+    parser.add_argument('--exp_label', default='ml3_rl2_baseline_run', help='label (typically name of method)')
     parser.add_argument('--env_name', default='ML3-v2', help='environment to train on')
 
     # -- RL2 (things to change in VariBAD to get to RL2 setup) --
@@ -23,7 +23,7 @@ def get_args(rest_args):
     parser.add_argument('--rlloss_through_encoder', type=boolean_argument, default=True,
                         help='backprop rl loss through encoder')
     # note: the latent_dim is just a layer in the policy (name comes from varibad code)
-    parser.add_argument('--latent_dim', type=int, default=128, help='dimensionality of latent space')
+    parser.add_argument('--latent_dim', type=int, default=256, help='dimensionality of latent space')
 
     # --- POLICY ---
 
@@ -50,7 +50,7 @@ def get_args(rest_args):
     parser.add_argument('--norm_actions_post_sampling', type=boolean_argument, default=False, help='normalise policy output')
 
     # network
-    parser.add_argument('--policy_layers', nargs='+', default=[256])
+    parser.add_argument('--policy_layers', nargs='+', default=[512])
     parser.add_argument('--policy_activation_function', type=str, default='tanh', help='tanh/relu/leaky-relu')
     parser.add_argument('--policy_initialisation', type=str, default='normc', help='normc/orthogonal')
     parser.add_argument('--policy_anneal_lr', type=boolean_argument, default=False)
@@ -60,30 +60,30 @@ def get_args(rest_args):
     parser.add_argument('--policy_optimiser', type=str, default='adam', help='choose: rmsprop, adam')
 
     # PPO specific
-    parser.add_argument('--ppo_num_epochs', type=int, default=2, help='number of epochs per PPO update')
-    parser.add_argument('--ppo_num_minibatch', type=int, default=4, help='number of minibatches to split the data')
-    parser.add_argument('--ppo_use_huberloss', type=boolean_argument, default=True, help='use huberloss instead of MSE')
-    parser.add_argument('--ppo_use_clipped_value_loss', type=boolean_argument, default=True, help='clip value loss')
+    parser.add_argument('--ppo_num_epochs', type=int, default=10, help='number of epochs per PPO update')
+    parser.add_argument('--ppo_num_minibatch', type=int, default=5, help='number of minibatches to split the data')
+    parser.add_argument('--ppo_use_huberloss', type=boolean_argument, default=False, help='use huberloss instead of MSE')
+    parser.add_argument('--ppo_use_clipped_value_loss', type=boolean_argument, default=False, help='clip value loss')
     parser.add_argument('--ppo_clip_param', type=float, default=0.2, help='clamp param')
 
     # other hyperparameters
     parser.add_argument('--lr_policy', type=float, default=5e-4, help='learning rate (default: 5e-4)')
     # Since we use RL2, we have to match this learning rate (for the encoder) with the policy learning rate
     parser.add_argument('--lr_vae', type=float, default=5e-4)
-    parser.add_argument('--num_processes', type=int, default=12,
+    parser.add_argument('--num_processes', type=int, default=21,
                         help='how many training CPU processes / parallel environments to use (default: 16)')
-    parser.add_argument('--policy_num_steps', type=int, default=500,
+    parser.add_argument('--policy_num_steps', type=int, default=5000,
                         help='number of env steps to do (per process) before updating')
     parser.add_argument('--policy_eps', type=float, default=1e-8, help='optimizer epsilon (1e-8 for ppo, 1e-5 for a2c)')
     parser.add_argument('--policy_init_std', type=float, default=0.5, help='only used for continuous actions')
     parser.add_argument('--policy_fix_std', type = boolean_argument, default=False, help='keeps std of the action distribution constant')
-    parser.add_argument('--policy_value_loss_coef', type=float, default=0.5, help='value loss coefficient')
+    parser.add_argument('--policy_value_loss_coef', type=float, default=1.0, help='value loss coefficient')
     parser.add_argument('--policy_entropy_coef', type=float, default=5e-6, help='entropy term coefficient')
     parser.add_argument('--policy_gamma', type=float, default=0.99, help='discount factor for rewards')
     parser.add_argument('--policy_use_gae', type=boolean_argument, default=True,
                         help='use generalized advantage estimation')
     parser.add_argument('--policy_tau', type=float, default=0.95, help='gae parameter')
-    parser.add_argument('--use_proper_time_limits', type=boolean_argument, default=True,
+    parser.add_argument('--use_proper_time_limits', type=boolean_argument, default=False,
                         help='treat timeout and death differently (important in mujoco)')
     parser.add_argument('--policy_max_grad_norm', type=float, default=0.5, help='max norm of gradients')
     parser.add_argument('--encoder_max_grad_norm', type=float, default=0.5, help='max norm of gradients')
@@ -117,11 +117,11 @@ def get_args(rest_args):
                         help='split batches up by elbo term (to save memory of if ELBOs are of different length)')
 
     # - encoder
-    parser.add_argument('--action_embedding_size', type=int, default=16)
-    parser.add_argument('--state_embedding_size', type=int, default=32)
-    parser.add_argument('--reward_embedding_size', type=int, default=16)
+    parser.add_argument('--action_embedding_size', type=int, default=32)
+    parser.add_argument('--state_embedding_size', type=int, default=64)
+    parser.add_argument('--reward_embedding_size', type=int, default=32)
     parser.add_argument('--encoder_layers_before_gru', nargs='+', type=int, default=[])
-    parser.add_argument('--encoder_gru_hidden_size', type=int, default=256, help='dimensionality of RNN hidden state')
+    parser.add_argument('--encoder_gru_hidden_size', type=int, default=128, help='dimensionality of RNN hidden state')
     parser.add_argument('--encoder_layers_after_gru', nargs='+', type=int, default=[])
 
     # - decoder: rewards
@@ -170,9 +170,9 @@ def get_args(rest_args):
 
     # logging, saving, evaluation
     parser.add_argument('--log_interval', type=int, default=25, help='log interval, one log per n updates')
-    parser.add_argument('--save_interval', type=int, default=500, help='save interval, one save per n updates')
+    parser.add_argument('--save_interval', type=int, default=10, help='save interval, one save per n updates')
     parser.add_argument('--save_intermediate_models', type=boolean_argument, default=False, help='save all models')
-    parser.add_argument('--eval_interval', type=int, default=25, help='eval interval, one eval per n updates')
+    parser.add_argument('--eval_interval', type=int, default=10, help='eval interval, one eval per n updates')
     parser.add_argument('--vis_interval', type=int, default=500, help='visualisation interval, one eval per n updates')
     parser.add_argument('--results_log_dir', default=None, help='directory to save results (None uses ./logs)')
 
