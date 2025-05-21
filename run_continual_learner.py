@@ -36,7 +36,7 @@ def main():
     parser.add_argument('--init_std', type = float, default=0.5, help = 'standard deviation for bicameral action dist')
     parser.add_argument('--use_gating_penalty', type = boolean_argument, default = False, help="apply a gating penalty to the loss function")
     parser.add_argument('--gating_alpha', type=float, default=0.75, help="exponent of gating penalty")
-    parser.add_argument('--gating_beta', type = float, default=0.1, help="multiplicative parameter for gating penalty")
+    parser.add_argument('--gating_beta', type = float, default=5, help="multiplicative parameter for gating penalty")
     parser.add_argument('--use_action_in_gate', type = boolean_argument, default = False, help='pass action to gating encoder')
     parser.add_argument('--use_state_in_gate', type = boolean_argument, default=False, help='pass state to gating encoder')
     parser.add_argument('--use_gating_schedule', type = boolean_argument, default = False, help="use an update schedule for gating values")
@@ -48,10 +48,10 @@ def main():
         
     ## PPO params
     parser.add_argument('--ppo_clip_param', type=float, default=0.2, help='PPO clip parameter')
-    parser.add_argument('--ppo_epoch', type=int, default=16, help="PPO update epochs")
-    parser.add_argument('--num_mini_batch', type=int, default=4, help="num minibatches per update")
-    parser.add_argument('--learning_rate', type=float, default=5e-4, help = "learning rate for network")
-    parser.add_argument('--entropy_coef', type= float, default=5e-3, help="entropy coefficient for the policy")
+    parser.add_argument('--ppo_epoch', type=int, default=8, help="PPO update epochs")
+    parser.add_argument('--num_mini_batch', type=int, default=20, help="num minibatches per update")
+    parser.add_argument('--learning_rate', type=float, default=1e-5, help = "learning rate for network")
+    parser.add_argument('--entropy_coef', type= float, default=1e-5, help="entropy coefficient for the policy")
     parser.add_argument('--gamma', type=float, default=0.99, help = "discount rate")
     parser.add_argument('--tau', type=float, default=0.97, help="discount rate for GAE")
     parser.add_argument('--normalise_rewards', type=boolean_argument, default=True, help="normalise rewards")
