@@ -1,4 +1,4 @@
-import torchcombin
+import torch
 import torch.nn as nn
 import numpy as np
 from models.policy import FixedNormal
@@ -189,25 +189,30 @@ class BiHemActorCritic(nn.Module):
         elif (self.gating_combination_method == GatingCombine.SELECT_SAMPLE):
             # for preserving the computational graph and handling the two std devs
             std_devs = torch.stack([
-                self.left_actor_critic.policy.dist.logstd.exp(),
-                self.right_actor_critic.policy.dist.logstd.exp()
+                self.left_actor_critic.policy.dist.fc_logstd(
+                    left_actor_features).exp(),
+                self.right_actor_critic.policy.dist.fc_logstd.exp(
+                    right_actor_features).exp()
             ])
 
             softmax_std_devs = torch.softmax(std_devs, axis=0)
-            hemisphere_confidence = 1 - torch.prod(softmax_std_devs, axis=1) # softmax represents the spread of distribution, therefore, lesser spread -> more confident
+            # softmax represents the spread of distribution, therefore, lesser spread -> more confident
+            hemisphere_confidence = 1 - torch.prod(softmax_std_devs, axis=1)
 
             # TODO Joel, need to figure out a better way to get the gating values brought to use
             left_gate_value_mean = torch.squeeze(left_gate_value).mean()
             right_gate_value_mean = torch.squeeze(right_gate_value).mean()
 
-            if (left_gate_value_mean * hemisphere_confidence[0].item()) > (right_gate_value_mean * hemisphere_confidence[1].item()):
+            if (left_gate_value_mean * hemisphere_confidence[0].item()) > \
+                    (right_gate_value_mean * hemisphere_confidence[1].item()):
                 # go with left hemisphere
                 combined_values = left_gate_value * left_value
                 dist = self.left_actor_critic.policy.dist(left_actor_features)
             else:
                 # go with right hemisphere
                 combined_values = right_gate_value * right_value
-                dist = self.right_actor_critic.policy.dist(right_actor_features)
+                dist = self.right_actor_critic.policy.dist(
+                    right_actor_features)
 
         if deterministic:
             actions = dist.mean
