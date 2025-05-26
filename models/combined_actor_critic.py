@@ -171,6 +171,8 @@ class BiHemActorCritic(nn.Module):
             gate_latent)
 
         combined_values, dist, actions = None, None, None
+        chosen_hemisphere = None  # 0 = left, 1 = right, None = both
+
         if (self.gating_combination_method == GatingCombine.SUMMATION):
             left_action_mean = self.left_actor_critic.policy.dist.fc_mean(
                 left_actor_features)
@@ -186,6 +188,7 @@ class BiHemActorCritic(nn.Module):
             # use 'self.std' for now
             std = torch.max(self.min_std, self.logstd.exp())
             dist = FixedNormal(combined_action_means, std)
+            chosen_hemisphere = None  # both used
         elif (self.gating_combination_method == GatingCombine.SELECT_SAMPLE):
             # for preserving the computational graph and handling the two std devs
             std_devs = torch.stack([
@@ -208,11 +211,13 @@ class BiHemActorCritic(nn.Module):
                 # go with left hemisphere
                 combined_values = left_gate_value * left_value
                 dist = self.left_actor_critic.policy.dist(left_actor_features)
+                chosen_hemisphere = 0
             else:
                 # go with right hemisphere
                 combined_values = right_gate_value * right_value
                 dist = self.right_actor_critic.policy.dist(
                     right_actor_features)
+                chosen_hemisphere = 1
 
         if deterministic:
             actions = dist.mean
@@ -222,12 +227,12 @@ class BiHemActorCritic(nn.Module):
         assert (combined_values is not None) or (dist is not None) or (actions is not None), \
             'either combined_values, dist, or actions have not been set'
 
-        return (combined_values, left_value, right_value), actions, dist, (left_gate_value, right_gate_value)
+        return (combined_values, left_value, right_value), actions, dist, (left_gate_value, right_gate_value), chosen_hemisphere
 
     def act(self, state, latent, belief=None, task=None, deterministic=False):
-        values, actions, _, gating_values = self.policy(
+        values, actions, _, gating_values, chosen_hemisphere = self.policy(
             state, latent, None, None, deterministic=deterministic)
-        return values, actions, gating_values
+        return values, actions, gating_values, chosen_hemisphere
 
     def get_value(self, state, latent, belief=None, task=None):
         value, _, _, _ = self.policy(state, latent, belief, task)

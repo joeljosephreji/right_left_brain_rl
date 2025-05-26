@@ -188,13 +188,13 @@ class ContinualLearner:
             right_init_args = right_policy_net.args
             del right_init_args.action_space  # not needed for logs, causes error in json
 
-        gating_combination_method = None
+        self.gating_combination_method = None
         if self.args.gating_combination_method == 'select_sample':
-            gating_combination_method = GatingCombine.SELECT_SAMPLE
+            self.gating_combination_method = GatingCombine.SELECT_SAMPLE
         elif self.args.gating_combination_method == 'summation':
-            gating_combination_method = GatingCombine.SUMMATION
+            self.gating_combination_method = GatingCombine.SUMMATION
 
-        assert gating_combination_method is not None, 'invalid gating combination method provided'
+        assert self.gating_combination_method is not None, 'invalid gating combination method provided'
 
         if self.args.algorithm == 'bicameral':
             ac = BiHemActorCritic(
@@ -204,7 +204,7 @@ class ContinualLearner:
                 self.envs.action_space.shape[0],
                 init_std=args.init_std,
                 # gating encoder args
-                gating_combination_method=gating_combination_method,
+                gating_combination_method=self.gating_combination_method,
                 use_action_in_gate=self.args.use_action_in_gate,
                 use_state_in_gate=self.args.use_state_in_gate,
                 # gating schedule functions
@@ -276,6 +276,9 @@ class ContinualLearner:
         """ Main Training loop """
         start_time = time.time()
         eps = 0
+        if self.gating_combination_method == GatingCombine.SELECT_SAMPLE:
+            right_hemisphere_chosen_count = 0
+            left_hemisphere_chosen_count = 0
 
         # steps limit is parameter for whole continual env
         while self.envs.get_env_attr('cur_step') < self.envs.get_env_attr('steps_limit'):
@@ -318,11 +321,19 @@ class ContinualLearner:
                 with torch.no_grad():
                     if self.args.algorithm == 'bicameral':
                         # TODO: don't like unsqueeze obs but ok for now
-                        (value, left_value, right_value), action, gate_values = \
+                        (value, left_value, right_value), action, gate_values, chosen_hemisphere = \
                             self.agent.act(obs.unsqueeze(
                                 0), latent, None, None)
                         # collect gating values
                         gating_values.append(gate_values[0].detach())
+                        # logging the chosen hemisphere
+                        if self.gating_combination_method == GatingCombine.SELECT_SAMPLE:
+                            assert chosen_hemisphere is not None, \
+                                "No hemisphere chosen in select sample!"
+                            if chosen_hemisphere == 0:
+                                left_hemisphere_chosen_count += 1
+                            elif chosen_hemisphere == 1:
+                                right_hemisphere_chosen_count += 1
                     elif self.args.algorithm == 'random':
                         action = torch.tensor(
                             np.array(
@@ -488,6 +499,19 @@ class ContinualLearner:
                 'train_results/left_gating_values', task_gating_values.mean(), frames)
 
             self.logger.add_tensorboard('current_task', current_task, frames)
+
+            # log hemisphere chosen count if select sample is the gating logic
+            if self.gating_combination_method == GatingCombine.SELECT_SAMPLE:
+                self.logger.add_tensorboard(
+                    'hemisphere_chosen/left_cumulative',
+                    left_hemisphere_chosen_count,
+                    frames
+                )
+                self.logger.add_tensorboard(
+                    'hemisphere_chosen/right_cumulative',
+                    right_hemisphere_chosen_count,
+                    frames
+                )
 
             # save to csv
             self.log_results(
