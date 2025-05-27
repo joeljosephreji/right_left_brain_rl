@@ -12,3 +12,5 @@ test_logs/
 *.slurm
 slurm_logs/
 
+pyrefly.toml
+

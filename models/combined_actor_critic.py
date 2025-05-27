@@ -173,13 +173,13 @@ class BiHemActorCritic(nn.Module):
         combined_values, dist, actions = None, None, None
         chosen_hemisphere = None  # 0 = left, 1 = right, None = both
 
+        left_action_mean = self.left_actor_critic.policy.dist.fc_mean(
+            left_actor_features)
+
+        right_action_mean = self.right_actor_critic.policy.dist.fc_mean(
+            right_actor_features)
+
         if (self.gating_combination_method == GatingCombine.SUMMATION):
-            left_action_mean = self.left_actor_critic.policy.dist.fc_mean(
-                left_actor_features)
-
-            right_action_mean = self.right_actor_critic.policy.dist.fc_mean(
-                right_actor_features)
-
             # combine action and value estimate
             combined_action_means = left_gate_value * \
                 left_action_mean + right_gate_value * right_action_mean
@@ -191,40 +191,58 @@ class BiHemActorCritic(nn.Module):
             chosen_hemisphere = None  # both used
         elif (self.gating_combination_method == GatingCombine.SELECT_SAMPLE):
             # for preserving the computational graph and handling the two std devs
-            std_devs = torch.stack([
+            std_devs = torch.stack((
                 self.left_actor_critic.policy.dist.fc_logstd(
                     left_actor_features).exp(),
-                self.right_actor_critic.policy.dist.fc_logstd.exp(
+                self.right_actor_critic.policy.dist.fc_logstd(
                     right_actor_features).exp()
-            ])
+            ))
 
             softmax_std_devs = torch.softmax(std_devs, axis=0)
             # softmax represents the spread of distribution, therefore, lesser spread -> more confident
-            hemisphere_confidence = 1 - torch.prod(softmax_std_devs, axis=1)
+            hemisphere_confidence = 1 - softmax_std_devs
 
-            # TODO Joel, need to figure out a better way to get the gating values brought to use
-            left_gate_value_mean = torch.squeeze(left_gate_value).mean()
-            right_gate_value_mean = torch.squeeze(right_gate_value).mean()
+            gating_stack = torch.stack((
+                left_gate_value,
+                right_gate_value
+            ))
 
-            if (left_gate_value_mean * hemisphere_confidence[0].item()) > \
-                    (right_gate_value_mean * hemisphere_confidence[1].item()):
-                # go with left hemisphere
-                combined_values = left_gate_value * left_value
-                dist = self.left_actor_critic.policy.dist(left_actor_features)
-                chosen_hemisphere = 0
-            else:
-                # go with right hemisphere
-                combined_values = right_gate_value * right_value
-                dist = self.right_actor_critic.policy.dist(
-                    right_actor_features)
-                chosen_hemisphere = 1
+            # finding confidence for the hemisphere per total action set
+            confidence_values = gating_stack * hemisphere_confidence
+            confidence_values = confidence_values.mean(dim=-1)
+            combined_value_select_left_hemisphere = (
+                confidence_values[0] > confidence_values[1]).unsqueeze(-1)
+            select_left_hemisphere = combined_value_select_left_hemisphere.expand(
+                    *combined_value_select_left_hemisphere.shape[:-1], 4)
+
+            # finding distribution where the correct hemisphere is chosen
+            combined_action_means = torch.where(
+                select_left_hemisphere, left_action_mean, right_action_mean)
+            combined_action_std_dev = torch.where(
+                select_left_hemisphere, std_devs[0], std_devs[1])
+            combined_action_std_dev = torch.clamp(
+                combined_action_std_dev, min=self.min_std)
+            dist = FixedNormal(combined_action_means, combined_action_std_dev)
+
+            # track the number of times the hemisphere is chosen
+            chosen_hemisphere = torch.zeros(2)
+            chosen_hemisphere[0] = torch.count_nonzero(select_left_hemisphere)
+            chosen_hemisphere[1] = torch.numel(
+                select_left_hemisphere) - chosen_hemisphere[0]
+
+            # combined value calculation
+            left_combined = left_gate_value * left_value
+            right_combined = right_gate_value * right_value
+            combined_values = torch.where(
+                combined_value_select_left_hemisphere, left_combined, right_combined)
+
 
         if deterministic:
             actions = dist.mean
         else:
             actions = dist.sample()  # assumes not deterministic
 
-        assert (combined_values is not None) or (dist is not None) or (actions is not None), \
+        assert (combined_values is not None) and (dist is not None) and (actions is not None), \
             'either combined_values, dist, or actions have not been set'
 
         return (combined_values, left_value, right_value), actions, dist, (left_gate_value, right_gate_value), chosen_hemisphere
@@ -235,14 +253,15 @@ class BiHemActorCritic(nn.Module):
         return values, actions, gating_values, chosen_hemisphere
 
     def get_value(self, state, latent, belief=None, task=None):
-        value, _, _, _ = self.policy(state, latent, belief, task)
+        value, _, _, _, _ = self.policy(state, latent, belief, task)
         return value
 
     def evaluate_actions(self, state, latent, belief, task, action):
         """
         Gets the distribution of the entire network
         """
-        values, _, dist, gating_values = self.policy(state, latent, None, None)
+        values, _, dist, gating_values, _ = self.policy(
+            state, latent, None, None)
         action_log_probs = dist.log_probs(action)
         dist_entropy = dist.entropy().mean()
         return values, action_log_probs, dist_entropy, gating_values

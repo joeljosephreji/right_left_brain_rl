@@ -276,14 +276,14 @@ class ContinualLearner:
         """ Main Training loop """
         start_time = time.time()
         eps = 0
-        if self.gating_combination_method == GatingCombine.SELECT_SAMPLE:
-            right_hemisphere_chosen_count = 0
-            left_hemisphere_chosen_count = 0
 
         # steps limit is parameter for whole continual env
         while self.envs.get_env_attr('cur_step') < self.envs.get_env_attr('steps_limit'):
 
             step = 0
+            if self.gating_combination_method == GatingCombine.SELECT_SAMPLE:
+                chosen_hemisphere_count = torch.zeros(2)
+
             obs = self.envs.reset()  # we reset all at once as metaworld is time limited
             current_task = self.envs.get_env_attr("cur_seq_idx")
             episode_reward = []
@@ -326,14 +326,9 @@ class ContinualLearner:
                                 0), latent, None, None)
                         # collect gating values
                         gating_values.append(gate_values[0].detach())
-                        # logging the chosen hemisphere
+                        # keep count of the number of hemispheres
                         if self.gating_combination_method == GatingCombine.SELECT_SAMPLE:
-                            assert chosen_hemisphere is not None, \
-                                "No hemisphere chosen in select sample!"
-                            if chosen_hemisphere == 0:
-                                left_hemisphere_chosen_count += 1
-                            elif chosen_hemisphere == 1:
-                                right_hemisphere_chosen_count += 1
+                            chosen_hemisphere_count += chosen_hemisphere
                     elif self.args.algorithm == 'random':
                         action = torch.tensor(
                             np.array(
@@ -503,13 +498,13 @@ class ContinualLearner:
             # log hemisphere chosen count if select sample is the gating logic
             if self.gating_combination_method == GatingCombine.SELECT_SAMPLE:
                 self.logger.add_tensorboard(
-                    'hemisphere_chosen/left_cumulative',
-                    left_hemisphere_chosen_count,
+                    'hemisphere_chosen/left_hemisphere',
+                    chosen_hemisphere_count[0],
                     frames
                 )
                 self.logger.add_tensorboard(
-                    'hemisphere_chosen/right_cumulative',
-                    right_hemisphere_chosen_count,
+                    'hemisphere_chosen/right_hemisphere',
+                    chosen_hemisphere_count[1],
                     frames
                 )
 
