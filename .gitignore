@@ -9,7 +9,7 @@ docker/
 ppo_imp/
 test_logs/
 
-*.slurm
+*.slurm.bak
 slurm_logs/
 
 pyrefly.toml
