@@ -498,12 +498,12 @@ class ContinualLearner:
             # log hemisphere chosen count if select sample is the gating logic
             if self.gating_combination_method == GatingCombine.SELECT_SAMPLE:
                 self.logger.add_tensorboard(
-                    'hemisphere_chosen/left_hemisphere',
+                    'train_hemisphere_chosen/left_hemisphere',
                     chosen_hemisphere_count[0],
                     frames
                 )
                 self.logger.add_tensorboard(
-                    'hemisphere_chosen/right_hemisphere',
+                    'train_hemisphere_chosen/right_hemisphere',
                     chosen_hemisphere_count[1],
                     frames
                 )
@@ -600,6 +600,9 @@ class ContinualLearner:
         # steps limit is parameter for whole continual env
         while test_envs.get_env_attr('cur_step') < test_envs.get_env_attr('steps_limit'):
 
+            if self.gating_combination_method == GatingCombine.SELECT_SAMPLE:
+                chosen_hemisphere_count = torch.zeros(2)
+
             obs = test_envs.reset()  # we reset all at once as metaworld is time limited
             current_task = test_envs.get_env_attr("cur_seq_idx")
             episode_reward = []
@@ -615,11 +618,13 @@ class ContinualLearner:
                 with torch.no_grad():
                     if (self.args.algorithm == 'bicameral') and (eval_run != 'left'):
                         # TODO: don't like unsqueeze obs but ok for now
-                        (_, left_value, right_value), action, gate_values = \
+                        (_, left_value, right_value), action, gate_values, chosen_hemisphere = \
                             self.agent.act(obs.unsqueeze(
                                 0), latent, None, None, deterministic=True)
                         # collect gating values
                         gating_values.append(gate_values[0].detach())
+                        if self.gating_combination_method == GatingCombine.SELECT_SAMPLE:
+                            chosen_hemisphere_count += chosen_hemisphere
                     else:
                         _, action = eval_agent.act(
                             obs, latent, None, None, deterministic=True)
@@ -663,6 +668,19 @@ class ContinualLearner:
                 f'{eval_run}/episode_success', task_successes, frames)
             self.logger.add_tensorboard(
                 f'{eval_run}/left_gating_values', task_gating_values.mean(), frames)
+
+            # log hemisphere chosen count if select sample is the gating logic
+            if self.gating_combination_method == GatingCombine.SELECT_SAMPLE:
+                self.logger.add_tensorboard(
+                    f'{eval_run}/left_hemisphere_count',
+                    chosen_hemisphere_count[0],
+                    frames
+                )
+                self.logger.add_tensorboard(
+                    f'{eval_run}/right_hemisphere_count',
+                    chosen_hemisphere_count[1],
+                    frames
+                )
 
             # save to csv
             self.log_results(
