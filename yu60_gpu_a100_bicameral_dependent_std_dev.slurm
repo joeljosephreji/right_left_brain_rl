@@ -3,7 +3,7 @@
 # Prepared By: Kai Xi,  Feb 2015
 #              help@massive.org.au
 
-#SBATCH --job-name=rl2_run
+#SBATCH --job-name=bicameral_run_dep_std_dev
 #SBATCH --account=yu60
 
 # Request CPU resource for a serial job
